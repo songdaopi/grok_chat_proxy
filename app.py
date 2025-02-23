@@ -408,4 +408,4 @@ def magic(messages):
 resolve_config()
 
 if __name__ == "__main__":
-    app.run(port=9898, debug=True)
+    app.run(port=9898)
