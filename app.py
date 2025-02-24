@@ -12,6 +12,7 @@ app = Flask(__name__)
 TARGET_URL = "https://grok.com/rest/app-chat/conversations/new"
 # CHECK_URL = "https://grok.com/rest/rate-limits"
 MODELS = ["grok-2", "grok-3", "grok-3-thinking"]
+CONFIG = {}
 TEMPORARY_MODE = False
 COOKIE_NUM = 0
 COOKIE_LIST = []
@@ -45,10 +46,10 @@ USER_AGENTS = [
 
 
 def resolve_config():
-    global COOKIE_NUM, COOKIE_LIST, LAST_COOKIE_INDEX, TEMPORARY_MODE
+    global COOKIE_NUM, COOKIE_LIST, LAST_COOKIE_INDEX, TEMPORARY_MODE, CONFIG
     with open("config.json", "r") as f:
-        config = json.load(f)
-    for cookies in config["cookies"]:
+        CONFIG = json.load(f)
+    for cookies in CONFIG["cookies"]:
         session = requests.Session()
         session.headers.update(
             {"user-agent": random.choice(USER_AGENTS), "cookie": cookies}
@@ -56,9 +57,9 @@ def resolve_config():
 
         COOKIE_LIST.append(session)
     COOKIE_NUM = len(COOKIE_LIST)
-    TEMPORARY_MODE = config["temporary_mode"]
+    TEMPORARY_MODE = CONFIG["temporary_mode"]
     for model in MODELS:
-        LAST_COOKIE_INDEX[model] = config["last_cookie_index"][model]
+        LAST_COOKIE_INDEX[model] = CONFIG["last_cookie_index"][model]
 
 
 @app.route("/v1/models", methods=["GET"])
@@ -105,6 +106,10 @@ def chat_completions():
 def get_next_account(model):
     current = (LAST_COOKIE_INDEX[model] + 1) % COOKIE_NUM
     LAST_COOKIE_INDEX[model] = current
+    print(f"Using account {current+1}/{COOKIE_NUM} for {model}")
+    CONFIG["last_cookie_index"][model] = current
+    with open("config.json", "w") as f:
+        json.dump(CONFIG, f, indent=4)
     return COOKIE_LIST[current]
 
 
