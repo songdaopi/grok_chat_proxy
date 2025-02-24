@@ -19,6 +19,7 @@ if __name__ == "__main__":
                 "grok-3-thinking": 0,
             },
             "temporary_mode": True,
+            "password": None,
         }
         print(f"Enter the cookies you got: ")
         config["cookies"].append(input())
