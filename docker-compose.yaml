@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   grok:
-    image: grok:latest
-    build: .
+    image: ghcr.io/songdaopi/grok_chat_proxy:main
     container_name: grok_chat_proxy
     restart: unless-stopped
     ports:
