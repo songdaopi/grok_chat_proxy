@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  grok:
+    image: grok:latest
+    build: .
+    container_name: grok_chat_proxy
+    restart: unless-stopped
+    ports:
+      - "9898:9898"
+    volumes:
+      - ./config.json:/app/config.json
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - grok_net
+
+networks:
+  grok_net:
+    driver: bridge
