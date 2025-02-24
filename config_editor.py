@@ -27,7 +27,7 @@ if __name__ == "__main__":
         print(f"1. Add")
         print(f"2. Delete all")
         print(f"3. Toggle temporary mode")
-        print(f"4. Exit")
+        print(f"4. Save and exit")
         choice = input()
         if choice == "1":
             print(f"Enter the cookies you got: ")
@@ -46,5 +46,10 @@ if __name__ == "__main__":
             again = False
         elif choice == "4":
             with open("config.json", "w") as f:
-                json.dump(config, f, indent=4)
+                # 在Windows上可能会保存不上，不知道为什么
+                json.dump(config, f)
+            if os.path.exists("config.json"):
+                print(f"config.json saved")
+            else:
+                print(f"Failed to save config.json")
             break
