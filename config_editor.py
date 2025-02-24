@@ -1,8 +1,14 @@
 import json
 import os
 
+# 获取项目根目录
+project_root = os.path.abspath(os.path.dirname(__file__))
+
+# config.json 文件的路径
+config_file_path = os.path.join(project_root, "config.json")
+
 if __name__ == "__main__":
-    if not os.path.exists("config.json"):
+    if not os.path.exists(config_file_path):
         print(f"config.json not found or empty, creating...")
         config = {
             "cookies": [],
@@ -16,7 +22,7 @@ if __name__ == "__main__":
         print(f"Enter the cookies you got: ")
         config["cookies"].append(input())
     else:
-        with open("config.json", "r") as f:
+        with open(config_file_path, "r") as f:
             config = json.load(f)
     again = True
     while True:
@@ -45,10 +51,9 @@ if __name__ == "__main__":
             )
             again = False
         elif choice == "4":
-            with open("config.json", "w") as f:
-                # 在Windows上可能会保存不上，不知道为什么
-                json.dump(config, f)
-            if os.path.exists("config.json"):
+            with open(config_file_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False)
+            if os.path.exists(config_file_path):
                 print(f"config.json saved")
             else:
                 print(f"Failed to save config.json")
