@@ -378,7 +378,7 @@ def format_message(messages):
             content = pattern.sub("", content)
             buffer.write(f"{content}\n")
         else:
-            buffer.write(f"{role}: {content}\n")
+            buffer.write(f"{role}: {content}\n\n")
     formatted_message = buffer.getvalue()
     with open("message_log.txt", "w", encoding="utf-8") as f:
         f.write(formatted_message)
