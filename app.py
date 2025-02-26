@@ -1,3 +1,4 @@
+import hashlib
 from flask import Flask, request, jsonify, Response
 import requests
 import io
@@ -6,17 +7,19 @@ import re
 import uuid
 import random
 import time
+from functools import wraps
 
 app = Flask(__name__)
 
 TARGET_URL = "https://grok.com/rest/app-chat/conversations/new"
-# CHECK_URL = "https://grok.com/rest/rate-limits"
+CHECK_URL = "https://grok.com/rest/rate-limits"
 MODELS = ["grok-2", "grok-3", "grok-3-thinking"]
 CONFIG = {}
 TEMPORARY_MODE = False
 COOKIE_NUM = 0
 COOKIE_LIST = []
 LAST_COOKIE_INDEX = {}
+PASSWORD = ""
 
 USER_AGENTS = [
     # Windows - Chrome
@@ -46,7 +49,7 @@ USER_AGENTS = [
 
 
 def resolve_config():
-    global COOKIE_NUM, COOKIE_LIST, LAST_COOKIE_INDEX, TEMPORARY_MODE, CONFIG
+    global COOKIE_NUM, COOKIE_LIST, LAST_COOKIE_INDEX, TEMPORARY_MODE, CONFIG, PASSWORD
     with open("config.json", "r") as f:
         CONFIG = json.load(f)
     for cookies in CONFIG["cookies"]:
@@ -60,9 +63,28 @@ def resolve_config():
     TEMPORARY_MODE = CONFIG["temporary_mode"]
     for model in MODELS:
         LAST_COOKIE_INDEX[model] = CONFIG["last_cookie_index"][model]
+    PASSWORD = CONFIG.get("password", "")
+
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not PASSWORD:
+            return f(*args, **kwargs)
+        auth = request.authorization
+        if not auth or not check_auth(auth.token):
+            return jsonify({"error": "Unauthorized access"}), 401
+        return f(*args, **kwargs)
+
+    return decorated
+
+
+def check_auth(password):
+    return hashlib.sha256(password.encode()).hexdigest() == PASSWORD
 
 
 @app.route("/v1/models", methods=["GET"])
+@require_auth
 def get_models():
     model_list = []
     for model in MODELS:
@@ -79,6 +101,7 @@ def get_models():
 
 
 @app.route("/v1/chat/completions", methods=["POST"])
+@require_auth
 def chat_completions():
     print("Received request")
     openai_request = request.get_json()
@@ -226,12 +249,12 @@ def send_message(message, model, disable_search, force_concise, is_reasoning):
                 yield f"data: [DONE]\n\n"
             except Exception as e:
                 print(f"Failed to send message: {e}")
-                yield f'data: {{"error": "{e}"}}\n\n'
+                yield f'data: {{"error": "{e}", "status": {response.status_code}}}\n\n'
 
         return Response(generate(), content_type="text/event-stream")
     except requests.exceptions.RequestException as e:
         print(f"Failed to send message: {e}")
-        return jsonify({"error": "Failed to send message"}), 500
+        return jsonify({"error": f"{e}", "status": response.status_code})
 
 
 def send_message_non_stream(
@@ -337,10 +360,10 @@ def send_message_non_stream(
             return jsonify(openai_response)
         except Exception as e:
             print(f"Failed to send message: {e}")
-            return jsonify({"error": "Failed to send message"}), 500
+            return jsonify({"error": f"{e}", "status": response.status_code})
     except requests.exceptions.RequestException as e:
         print(f"Failed to send message: {e}")
-        return jsonify({"error": "Failed to send message"}), 500
+        return jsonify({"error": f"{e}", "status": response.status_code})
 
 
 def format_message(messages):
@@ -355,7 +378,7 @@ def format_message(messages):
             content = pattern.sub("", content)
             buffer.write(f"{content}\n")
         else:
-            buffer.write(f"{role}: {content}\n")
+            buffer.write(f"{role}: {content}\n\n")
     formatted_message = buffer.getvalue()
     with open("message_log.txt", "w", encoding="utf-8") as f:
         f.write(formatted_message)
@@ -408,6 +431,47 @@ def magic(messages):
         first_message = re.sub(r"<\|forceConcise\|>", "", first_message)
     messages[0]["content"] = first_message
     return (disable_search, force_concise, messages)
+
+
+def check_rate_limit(session, model, is_reasoning):
+    headers = {
+        "authority": "grok.com",
+        "method": "POST",
+        "path": "/rest/rate-limits",
+        "scheme": "https",
+        "accept": "*/*",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "cache-control": "no-cache",
+        "content-type": "application/json",
+        "origin": "https://grok.com",
+        "pragma": "no-cache",
+        "priority": "u=1, i",
+        "referer": "https://grok.com/",
+        "sec-ch-ua": '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+    }
+    payload = {
+        "requestKind": "REASONING" if is_reasoning else "DEFAULT",
+        "modelName": model,
+    }
+    try:
+        response = session.post(CHECK_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        data = json.loads(response.content)
+        if data["remainingQueries"] != 0:
+            return (True, data["remainingQueries"])
+        else:
+            available_time = time.time() + data["waitTimeSeconds"]
+            return (False, available_time)
+
+    except Exception as e:
+        print(f"Failed to check rate limit: {e}")
+        return (False, None)
 
 
 resolve_config()

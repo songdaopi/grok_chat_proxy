@@ -1,5 +1,6 @@
 import json
 import os
+import hashlib
 
 # 获取项目根目录
 project_root = os.path.abspath(os.path.dirname(__file__))
@@ -18,6 +19,7 @@ if __name__ == "__main__":
                 "grok-3-thinking": 0,
             },
             "temporary_mode": True,
+            "password": None,
         }
         print(f"Enter the cookies you got: ")
         config["cookies"].append(input())
@@ -33,7 +35,8 @@ if __name__ == "__main__":
         print(f"1. Add")
         print(f"2. Delete all")
         print(f"3. Toggle temporary mode")
-        print(f"4. Save and exit")
+        print(f"4. Set password")
+        print(f"5. Save and exit")
         choice = input()
         if choice == "1":
             print(f"Enter the cookies you got: ")
@@ -51,10 +54,15 @@ if __name__ == "__main__":
             )
             again = False
         elif choice == "4":
+            print(f"Enter the password, leave empty to clear:")
+            password = input()
+            if password:
+                config["password"] = hashlib.sha256(password.encode()).hexdigest()
+                print(f"Password set.")
+            else:
+                config.pop("password", None)
+                print(f"Password cleared.")
+        elif choice == "5":
             with open(config_file_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False)
-            if os.path.exists(config_file_path):
-                print(f"config.json saved")
-            else:
-                print(f"Failed to save config.json")
             break
