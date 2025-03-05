@@ -1,5 +1,5 @@
 # 使用 Python 3.12.9-slim-bullseye 作為基礎映像
-FROM python:3.12.9-slim-bullseye
+FROM python:3.12-slim-bullseye
 
 # 設定工作目錄
 WORKDIR /app
